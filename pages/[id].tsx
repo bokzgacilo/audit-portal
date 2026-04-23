@@ -178,7 +178,7 @@ function CenteredState({ children }: { children: React.ReactNode }) {
 function AuditFileViewer({ audit }: { audit: Audit }) {
   const format = audit.format.toLowerCase();
 
-  if (format === "pdf") {
+  if (format.includes("pdf")) {
     return (
       <iframe
         title={`${audit.name} PDF viewer`}
@@ -188,7 +188,7 @@ function AuditFileViewer({ audit }: { audit: Audit }) {
     );
   }
 
-  if (format === "video") {
+  if (format.includes("video")) {
     return (
       <Box
         display="flex"
@@ -210,7 +210,7 @@ function AuditFileViewer({ audit }: { audit: Audit }) {
 
   console.log(audit)
 
-  if (format === "html") {
+  if (format.includes("html")) {
     return (
       <iframe
         srcDoc={audit.html_text}

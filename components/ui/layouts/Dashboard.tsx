@@ -39,13 +39,11 @@ const NavTab = ({
       _hover={{
         bg: "bg.subtle",
       }}
-      border={isActive ? "1px solid" : "1px solid transparent"}
-      borderColor={isActive ? "border" : "transparent"}
       cursor="pointer"
       onClick={() => router.push(path)}
     >
       <Icon>{icon}</Icon>
-      <Text>{label}</Text>
+      <Text fontSize="12px">{label}</Text>
       <Icon ml="auto">
         <LuChevronRight />
       </Icon>
@@ -142,7 +140,7 @@ export default function DashboardLayout({
           </Button>
         </HStack>
       </Flex>
-      <SimpleGrid flex={1} templateColumns="300px 1fr">
+      <SimpleGrid flex={1} templateColumns="250px 1fr">
         <Stack p={2} borderRight="1px solid" gap={0} borderRightColor="border">
           <Text mb={2} mt={4} fontWeight="semibold" fontSize="xs">
             MANAGE
@@ -156,7 +154,7 @@ export default function DashboardLayout({
             />
           ))}
         </Stack>
-        <Box bg="bg.panel" p={0}>
+        <Box bg="bg.panel" overflowY="auto" p={0}>
           {children}
         </Box>
       </SimpleGrid>

@@ -10,6 +10,8 @@ import {
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/service/supabase";
+import Head from "next/head";
+import { LuCheck, LuDoorClosed, LuKey } from "react-icons/lu";
 
 const OTP_LENGTH = 8;
 const OTP_INPUTS = [
@@ -126,88 +128,94 @@ export default function Home() {
   }
 
   return (
-    <Stack mx="auto" my="10%" w="280px" gap={4}>
-      <Heading>Kasama Audits</Heading>
+    <>
+      <Head>
+        <title>Sign in - Kasama Audits</title>
+      </Head>
+      <Stack mx="auto" py="5%" w="500px" gap={4}>
+        <Heading>Kasama Audits</Heading>
 
-      {!otpSent ? (
-        <>
-          <Field.Root>
-            <Field.Label>Email</Field.Label>
-            <Input
-              size="xs"
-              type="email"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-            <Field.HelperText>
-              Enter kasama email to get OTP in order to sign in
-            </Field.HelperText>
-          </Field.Root>
+        {!otpSent ? (
+          <>
+            <Field.Root>
+              <Field.Label>Email</Field.Label>
+              <Input
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+              <Field.HelperText>
+                Enter kasama email to get OTP in order to sign in
+              </Field.HelperText>
+            </Field.Root>
 
-          <Button
-            size="xs"
-            onClick={handleGetOTP}
-            loading={isSendingOtp}
-            disabled={isSendingOtp}
-          >
-            Get OTP
-          </Button>
-        </>
-      ) : (
-        <>
-          <Field.Root>
-            <Field.Label>OTP</Field.Label>
-            <PinInput.Root
-              otp
-              type="numeric"
-              value={otp.split("")}
-              onValueChange={(details) => setOtp(details.valueAsString)}
+            <Button
+              onClick={handleGetOTP}
+              loading={isSendingOtp}
+              disabled={isSendingOtp}
             >
-              <PinInput.HiddenInput />
-              <PinInput.Control>
-                {OTP_INPUTS.map((key, index) => (
-                  <PinInput.Input key={key} index={index} />
-                ))}
-              </PinInput.Control>
-            </PinInput.Root>
-            <Field.HelperText>Enter the OTP sent to {email}</Field.HelperText>
-          </Field.Root>
+              Get OTP
+              <LuKey />
+            </Button>
+          </>
+        ) : (
+          <>
+            <Field.Root>
+              <Field.Label>OTP</Field.Label>
+              <PinInput.Root
+                w="100%"
+                justifyContent="space-between"
+                otp
+                type="numeric"
+                value={otp.split("")}
+                onValueChange={(details) => setOtp(details.valueAsString)}
+              >
+                <PinInput.HiddenInput />
+                <PinInput.Control >
+                  {OTP_INPUTS.map((key, index) => (
+                    <PinInput.Input key={key} index={index} />
+                  ))}
+                </PinInput.Control>
+              </PinInput.Root>
+              <Field.HelperText>Enter the OTP sent to {email}</Field.HelperText>
+            </Field.Root>
 
-          <Button
-            size="xs"
-            onClick={handleSignIn}
-            loading={isSigningIn}
-            disabled={isSigningIn}
-          >
-            Sign in
-          </Button>
+            <Button
+              onClick={handleSignIn}
+              loading={isSigningIn}
+              disabled={isSigningIn}
+            >
+              Sign in
+              <LuCheck />
+            </Button>
 
-          <Button
-            size="xs"
-            variant="ghost"
-            onClick={() => {
-              setOtpSent(false);
-              setOtp("");
-              setMessage(null);
-              setError(null);
-            }}
-          >
-            Use another email
-          </Button>
-        </>
-      )}
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setOtpSent(false);
+                setOtp("");
+                setMessage(null);
+                setError(null);
+              }}
+            >
+              Use another email
+            </Button>
+          </>
+        )}
 
-      {message ? (
-        <Text color="fg.subtle" fontSize="xs">
-          {message}
-        </Text>
-      ) : null}
-      {error ? (
-        <Text color="red.fg" fontSize="xs">
-          {error}
-        </Text>
-      ) : null}
-    </Stack>
+        {message ? (
+          <Text color="fg.subtle" fontSize="xs">
+            {message}
+          </Text>
+        ) : null}
+        {error ? (
+          <Text color="red.fg" fontSize="xs">
+            {error}
+          </Text>
+        ) : null}
+      </Stack>
+    </>
+
   );
 }

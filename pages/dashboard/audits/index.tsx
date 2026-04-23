@@ -2,47 +2,74 @@ import {
   Badge,
   Box,
   Button,
+  Checkbox,
+  Drawer,
   Flex,
-  Heading,
   HStack,
-  Icon,
   IconButton,
   Input,
-  NativeSelect,
+  Portal,
   Spinner,
   Stack,
   Table,
   Text,
-  Wrap,
 } from "@chakra-ui/react";
 import Head from "next/head";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import {
-  LuChevronLeft,
-  LuChevronRight,
-  LuExternalLink,
-  LuFileText,
-  LuPlus,
-  LuSearch,
-  LuTrash2,
-} from "react-icons/lu";
+import { LuCopy, LuEye, LuFilter, LuPlus, LuSearch, LuTrash2, LuX } from "react-icons/lu";
+import CreateAuditForm from "@/components/CreateAuditForm";
 import { supabase } from "@/service/supabase";
 
 type Audit = {
   id: string;
   name: string;
-  type: string;
-  createdOn: string;
-  reportUrl: string;
-  visitUrl: string;
-  password?: string;
   slug: string;
-  link: string;
+  status: string;
+  type: string;
+  format: string;
+  created_at: string;
+  link?: string;
   file_path: string;
+  html_text: string;
 };
 
 const PAGE_SIZE = 6;
+
+const formatCreatedOn = (createdAt: string) => {
+  const date = new Date(createdAt);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+};
+
+const getAuditFormatLabel = (audit: Audit) => {
+  const formatText = `${audit.format ?? ""} ${audit.file_path ?? ""}`.toLowerCase();
+
+  if (formatText.includes("pdf")) {
+    return "PDF";
+  }
+
+  if (formatText.includes("video") || formatText.includes("mp4") || formatText.includes("mov")) {
+    return "Video";
+  }
+
+  if (formatText.includes("html") || formatText.includes("htm")) {
+    return "HTML";
+  }
+
+  return audit.format || "—";
+};
+
+const getStatusLabel = (status: string) =>
+  status?.toLowerCase() === "active" ? "Live" : "Draft";
 
 export default function Audits() {
   const [query, setQuery] = useState("");
@@ -53,6 +80,7 @@ export default function Audits() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletingAuditId, setDeletingAuditId] = useState<string | null>(null);
+  const [copiedAuditId, setCopiedAuditId] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -77,8 +105,8 @@ export default function Audits() {
       setAudits(
         (data ?? []).sort(
           (first, second) =>
-            new Date(second.createdOn).getTime() -
-            new Date(first.createdOn).getTime(),
+            new Date(second.created_at).getTime() -
+            new Date(first.created_at).getTime(),
         ),
       );
       setIsLoading(false);
@@ -108,9 +136,9 @@ export default function Audits() {
       const searchableText = [
         audit.name,
         audit.type,
-        audit.createdOn,
-        audit.reportUrl,
-        audit.visitUrl,
+        audit.status,
+        audit.created_at,
+        getAuditFormatLabel(audit),
       ]
         .join(" ")
         .toLowerCase();
@@ -176,236 +204,214 @@ export default function Audits() {
       currentAudits.filter((currentAudit) => currentAudit.id !== audit.id),
     );
     setDeletingAuditId(null);
+    setSelection([]);
   };
+
+  const handleCopyLink = async (audit: Audit) => {
+    const auditUrl = `${window.location.origin}/${audit.slug}`;
+
+    await navigator.clipboard.writeText(auditUrl);
+    setCopiedAuditId(audit.id);
+    window.setTimeout(() => setCopiedAuditId(null), 1500);
+  };
+
+  const [selection, setSelection] = useState<string[]>([])
+  const indeterminate = selection.length > 0 && selection.length < visibleAudits.length
 
   return (
     <>
       <Head>
         <title>Audits - Kasama Audit Portal</title>
       </Head>
-      <Stack h="full" gap={4} overflowY="auto" p={4}>
-        <Flex alignItems="center" gap={4} justifyContent="space-between">
-          <Box>
-            <Heading size="3xl">Audits</Heading>
-            <Text color="fg.subtle" fontSize="sm">
-              {filteredAudits.length} records
-            </Text>
-          </Box>
-          <Button asChild size="sm">
-            <Link href="/dashboard/audits/create">
-              <LuPlus />
-              New audit
-            </Link>
-          </Button>
-        </Flex>
+      <Stack h="full" gap={0} overflowY="auto" p={0}>
+        <Flex p={2} gap={2} borderBottom="1px solid" borderBottomColor="border">
+          <Drawer.Root size="lg">
+            <Drawer.Trigger asChild>
+              <IconButton variant="ghost">
+                <LuPlus />
+              </IconButton>
+            </Drawer.Trigger>
+            <Portal>
+              <Drawer.Positioner>
+                <Drawer.Content>
+                  <Drawer.Header>
+                    <Drawer.CloseTrigger asChild>
+                      <IconButton variant="ghost">
+                        <LuX />
+                      </IconButton>
+                    </Drawer.CloseTrigger>
+                    <Drawer.Title>Create Audit</Drawer.Title>
+                  </Drawer.Header>
+                  <Drawer.Body>
+                    <CreateAuditForm />
+                  </Drawer.Body>
+                </Drawer.Content>
+              </Drawer.Positioner>
+            </Portal>
+          </Drawer.Root>
 
-        <Flex
-          alignItems={{ base: "stretch", md: "center" }}
-          gap={3}
-          flexDirection={{ base: "column", md: "row" }}
-        >
-          <Box flex={1} position="relative">
-            <Icon
-              color="fg.subtle"
-              left={3}
-              pointerEvents="none"
-              position="absolute"
-              top="50%"
-              transform="translateY(-50%)"
-            >
-              <LuSearch />
-            </Icon>
-            <Input
-              pl={10}
-              placeholder="Search audits, links, or shared emails"
-              value={query}
-              onChange={(event) => handleSearch(event.target.value)}
-            />
-          </Box>
-          <NativeSelect.Root maxW={{ base: "full", md: "220px" }}>
-            <NativeSelect.Field
-              value={typeFilter}
-              onChange={(event) => handleFilter(event.target.value)}
-            >
-              {auditTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
-        </Flex>
+          <IconButton variant="ghost">
+            <LuFilter />
+          </IconButton>
 
-        <Box
-          border="1px solid"
-          borderColor="border"
-          overflow="hidden"
-          rounded="sm"
-        >
-          <Table.ScrollArea>
-            <Table.Root size="sm" variant="outline">
-              <Table.Header>
-                <Table.Row bg="bg.muted">
-                  <Table.ColumnHeader minW="260px">Name</Table.ColumnHeader>
-                  <Table.ColumnHeader>Type</Table.ColumnHeader>
-                  <Table.ColumnHeader minW="130px">
-                    Created on
-                  </Table.ColumnHeader>
-                  <Table.ColumnHeader>Links</Table.ColumnHeader>
-                  <Table.ColumnHeader>Visit</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="end">
-                    Actions
-                  </Table.ColumnHeader>
+          <Input
+            ml="auto"
+            maxW="500px"
+            variant="flushed"
+            placeholder="Search audits, links, or shared emails"
+            value={query}
+            onChange={(event) => handleSearch(event.target.value)}
+          />
+          <IconButton variant="ghost">
+            <LuSearch />
+          </IconButton>
+        </Flex>
+        <Table.ScrollArea>
+          <Table.Root variant="line">
+            <Table.Header>
+              <Table.Row bg="bg.muted">
+                <Table.ColumnHeader w="6">
+                  <Checkbox.Root
+                    size="sm"
+                    mt="0.5"
+                    aria-label="Select all rows"
+                    checked={indeterminate ? "indeterminate" : selection.length > 0}
+                    onCheckedChange={(changes) => {
+                      setSelection(
+                        changes.checked ? visibleAudits.map((audit) => audit.name) : [],
+                      )
+                    }}
+                  >
+                    <Checkbox.HiddenInput />
+                    <Checkbox.Control />
+                  </Checkbox.Root>
+                </Table.ColumnHeader>
+                <Table.ColumnHeader>Name</Table.ColumnHeader>
+                <Table.ColumnHeader>Status</Table.ColumnHeader>
+                <Table.ColumnHeader>Type</Table.ColumnHeader>
+                <Table.ColumnHeader>Format</Table.ColumnHeader>
+                <Table.ColumnHeader>Created On</Table.ColumnHeader>
+                <Table.ColumnHeader textAlign="end">
+                  Actions
+                </Table.ColumnHeader>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {isLoading ? (
+                <Table.Row>
+                  <Table.Cell colSpan={12}>
+                    <Stack alignItems="center" gap={4} py={8}>
+                      <Spinner size="md" />
+                      <Text color="fg.subtle" fontSize="sm">
+                        Loading audits...
+                      </Text>
+                    </Stack>
+                  </Table.Cell>
                 </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {isLoading ? (
-                  <Table.Row>
-                    <Table.Cell colSpan={6}>
-                      <Stack alignItems="center" gap={3} py={10}>
-                        <Spinner size="md" />
-                        <Text color="fg.subtle" fontSize="sm">
-                          Loading audits...
-                        </Text>
-                      </Stack>
+              ) : null}
+              {!isLoading && !loadError && visibleAudits.length === 0 ? (
+                <Table.Row>
+                  <Table.Cell colSpan={12}>
+                    <Stack alignItems="center" gap={4} py={8}>
+                      <Text fontWeight="medium">No audits found</Text>
+                      <Text color="fg.subtle" fontSize="sm">
+                        Try adjusting your search or filters
+                      </Text>
+                    </Stack>
+                  </Table.Cell>
+                </Table.Row>
+              ) : null}
+              {!isLoading && !loadError
+                ? visibleAudits.map((audit) => (
+                  <Table.Row
+                    key={audit.id}
+                    data-selected={selection.includes(audit.name) ? "" : undefined}
+                  >
+                    <Table.Cell>
+                      <Checkbox.Root
+                        size="sm"
+                        mt="0.5"
+                        aria-label="Select row"
+                        checked={selection.includes(audit.name)}
+                        onCheckedChange={(changes) => {
+                          setSelection((prev) =>
+                            changes.checked
+                              ? [...prev, audit.name]
+                              : selection.filter((name) => name !== audit.name),
+                          )
+                        }}
+                      >
+                        <Checkbox.HiddenInput />
+                        <Checkbox.Control />
+                      </Checkbox.Root>
+                    </Table.Cell>
+                    <Table.Cell>{audit.name}</Table.Cell>
+                    <Table.Cell>
+                      <Badge
+                        colorPalette={
+                          audit.status?.toLowerCase() === "active"
+                            ? "green"
+                            : "gray"
+                        }
+                        variant="subtle"
+                      >
+                        {getStatusLabel(audit.status)}
+                      </Badge>
+                    </Table.Cell>
+                    <Table.Cell>{audit.type}</Table.Cell>
+                    <Table.Cell>{getAuditFormatLabel(audit)}</Table.Cell>
+                    <Table.Cell>{formatCreatedOn(audit.created_at)}</Table.Cell>
+                    <Table.Cell textAlign="end">
+                      <HStack justifyContent="flex-end">
+                        <IconButton
+                          asChild
+                          aria-label={`View ${audit.name}`}
+                          size="xs"
+                          variant="ghost"
+                        >
+                          <Link href={`/${audit.slug}`}>
+                            <LuEye />
+                          </Link>
+                        </IconButton>
+                        <IconButton
+                          aria-label={`Copy link for ${audit.name}`}
+                          size="xs"
+                          variant="ghost"
+                          onClick={() => handleCopyLink(audit)}
+                        >
+                          <LuCopy />
+                        </IconButton>
+                        <IconButton
+                          aria-label={`Delete ${audit.name}`}
+                          colorPalette="red"
+                          size="xs"
+                          variant="ghost"
+                          loading={deletingAuditId === audit.id}
+                          onClick={() => handleDeleteAudit(audit)}
+                        >
+                          <LuTrash2 />
+                        </IconButton>
+                        {copiedAuditId === audit.id ? (
+                          <Text color="fg.subtle" fontSize="xs">
+                            Copied
+                          </Text>
+                        ) : null}
+                      </HStack>
                     </Table.Cell>
                   </Table.Row>
-                ) : null}
-                {!isLoading && loadError ? (
-                  <Table.Row>
-                    <Table.Cell colSpan={6}>
-                      <Stack alignItems="center" gap={1} py={8}>
-                        <Text fontWeight="medium">Could not load audits</Text>
-                        <Text color="fg.subtle" fontSize="sm">
-                          {loadError}
-                        </Text>
-                      </Stack>
-                    </Table.Cell>
-                  </Table.Row>
-                ) : null}
-                {!isLoading && !loadError
-                  ? visibleAudits.map((audit) => (
-                      <Table.Row key={audit.id}>
-                        <Table.Cell>
-                          <Stack gap={0}>
-                            <Button
-                              asChild
-                              alignSelf="flex-start"
-                              h="auto"
-                              minW={0}
-                              p={0}
-                              textAlign="left"
-                              variant="plain"
-                              whiteSpace="normal"
-                            >
-                              <Link href={`/${audit.slug}`}>{audit.name}</Link>
-                            </Button>
-                            <Text color="fg.subtle" fontSize="xs">
-                              {audit.id}
-                            </Text>
-                          </Stack>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Badge colorPalette="blue" variant="subtle">
-                            {audit.type}
-                          </Badge>
-                        </Table.Cell>
-                        <Table.Cell whiteSpace="nowrap">
-                          {audit.createdOn}
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Button size="xs" variant="ghost">
-                            <LuFileText />
-                            Report
-                          </Button>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <IconButton
-                            asChild
-                            aria-label={`Visit ${audit.name}`}
-                            size="xs"
-                            variant="outline"
-                          >
-                            <a
-                              href={audit.visitUrl}
-                              rel="noreferrer"
-                              target="_blank"
-                            >
-                              <LuExternalLink />
-                            </a>
-                          </IconButton>
-                        </Table.Cell>
-                        <Table.Cell textAlign="end">
-                          <IconButton
-                            aria-label={`Delete ${audit.name}`}
-                            colorPalette="red"
-                            disabled={deletingAuditId !== null}
-                            loading={deletingAuditId === audit.id}
-                            onClick={() => handleDeleteAudit(audit)}
-                            size="xs"
-                            variant="outline"
-                          >
-                            <LuTrash2 />
-                          </IconButton>
-                        </Table.Cell>
-                      </Table.Row>
-                    ))
-                  : null}
-                {!isLoading && !loadError && visibleAudits.length === 0 ? (
-                  <Table.Row>
-                    <Table.Cell colSpan={6}>
-                      <Stack alignItems="center" gap={1} py={8}>
-                        <Text fontWeight="medium">No audits found</Text>
-                        <Text color="fg.subtle" fontSize="sm">
-                          Adjust the search or filter to show more records.
-                        </Text>
-                      </Stack>
-                    </Table.Cell>
-                  </Table.Row>
-                ) : null}
-              </Table.Body>
-            </Table.Root>
-          </Table.ScrollArea>
-        </Box>
+                ))
+                : null}
+            </Table.Body>
+          </Table.Root>
+        </Table.ScrollArea>
 
         {deleteError ? (
           <Text color="red.fg" fontSize="sm">
             {deleteError}
           </Text>
         ) : null}
-
-        <Flex alignItems="center" gap={3} justifyContent="space-between">
-          <Text color="fg.subtle" fontSize="sm">
-            Showing {filteredAudits.length === 0 ? 0 : startIndex + 1}-
-            {Math.min(startIndex + PAGE_SIZE, filteredAudits.length)} of{" "}
-            {filteredAudits.length}
-          </Text>
-          <HStack gap={2}>
-            <IconButton
-              aria-label="Previous page"
-              disabled={currentPage === 1}
-              onClick={() => setPage((value) => Math.max(1, value - 1))}
-              size="xs"
-              variant="outline"
-            >
-              <LuChevronLeft />
-            </IconButton>
-            <Text fontSize="sm" minW="72px" textAlign="center">
-              Page {currentPage} of {pageCount}
-            </Text>
-            <IconButton
-              aria-label="Next page"
-              disabled={currentPage === pageCount}
-              onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
-              size="xs"
-              variant="outline"
-            >
-              <LuChevronRight />
-            </IconButton>
-          </HStack>
-        </Flex>
       </Stack>
     </>
   );
 }
+
