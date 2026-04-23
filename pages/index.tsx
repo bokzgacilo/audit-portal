@@ -1,78 +1,213 @@
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
+import {
+  Button,
+  Field,
+  Heading,
+  Input,
+  PinInput,
+  Stack,
+  Text,
+} from "@chakra-ui/react";
+import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
+import { supabase } from "@/service/supabase";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const OTP_LENGTH = 8;
+const OTP_INPUTS = [
+  "otp-1",
+  "otp-2",
+  "otp-3",
+  "otp-4",
+  "otp-5",
+  "otp-6",
+  "otp-7",
+  "otp-8",
+];
 
 export default function Home() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (session) {
+        router.replace("/dashboard/audits");
+        return;
+      }
+
+      setIsCheckingSession(false);
+    };
+
+    checkSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
+
+  const handleGetOTP = async () => {
+    setError(null);
+    setMessage(null);
+
+    if (!email.trim()) {
+      setError("Enter your email first.");
+      return;
+    }
+
+    setIsSendingOtp(true);
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        shouldCreateUser: true,
+      },
+    });
+    setIsSendingOtp(false);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    setOtp("");
+    setOtpSent(true);
+    setMessage("OTP sent. Check your email.");
+  };
+
+  const handleSignIn = async () => {
+    setError(null);
+    setMessage(null);
+
+    if (otp.length !== OTP_LENGTH) {
+      setError("Enter the complete OTP.");
+      return;
+    }
+
+    setIsSigningIn(true);
+    const { error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: otp,
+      type: "email",
+    });
+    setIsSigningIn(false);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    router.push("/dashboard");
+  };
+
+  if (isCheckingSession) {
+    return (
+      <Stack mx="auto" my="10%" w="280px" gap={4}>
+        <Heading>Kasama Audits</Heading>
+        <Text color="fg.subtle" fontSize="sm">
+          Checking session...
+        </Text>
+      </Stack>
+    );
+  }
+
   return (
-    <div
-      className={`${geistSans.className} ${geistMono.className} flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black`}
-    >
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the index.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+    <Stack mx="auto" my="10%" w="280px" gap={4}>
+      <Heading>Kasama Audits</Heading>
+
+      {!otpSent ? (
+        <>
+          <Field.Root>
+            <Field.Label>Email</Field.Label>
+            <Input
+              size="xs"
+              type="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs/pages/getting-started?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <Field.HelperText>
+              Enter kasama email to get OTP in order to sign in
+            </Field.HelperText>
+          </Field.Root>
+
+          <Button
+            size="xs"
+            onClick={handleGetOTP}
+            loading={isSendingOtp}
+            disabled={isSendingOtp}
           >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            Get OTP
+          </Button>
+        </>
+      ) : (
+        <>
+          <Field.Root>
+            <Field.Label>OTP</Field.Label>
+            <PinInput.Root
+              otp
+              type="numeric"
+              value={otp.split("")}
+              onValueChange={(details) => setOtp(details.valueAsString)}
+            >
+              <PinInput.HiddenInput />
+              <PinInput.Control>
+                {OTP_INPUTS.map((key, index) => (
+                  <PinInput.Input key={key} index={index} />
+                ))}
+              </PinInput.Control>
+            </PinInput.Root>
+            <Field.HelperText>Enter the OTP sent to {email}</Field.HelperText>
+          </Field.Root>
+
+          <Button
+            size="xs"
+            onClick={handleSignIn}
+            loading={isSigningIn}
+            disabled={isSigningIn}
+          >
+            Sign in
+          </Button>
+
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => {
+              setOtpSent(false);
+              setOtp("");
+              setMessage(null);
+              setError(null);
+            }}
+          >
+            Use another email
+          </Button>
+        </>
+      )}
+
+      {message ? (
+        <Text color="fg.subtle" fontSize="xs">
+          {message}
+        </Text>
+      ) : null}
+      {error ? (
+        <Text color="red.fg" fontSize="xs">
+          {error}
+        </Text>
+      ) : null}
+    </Stack>
   );
 }
