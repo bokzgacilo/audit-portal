@@ -52,7 +52,7 @@ const NavTab = ({
 };
 
 const NavigationItems = [
-  { icon: <LuFile />, label: "Audits", path: "/dashboard/audits" },
+  { icon: <LuFile />, label: "Audits", path: "/dashboard" },
   // { icon: <LuUsers />, label: "Prospects", path: "/dashboard/prospects" },
   // { icon: <LuSettings />, label: "Settings", path: "/dashboard/settings" },
 ];

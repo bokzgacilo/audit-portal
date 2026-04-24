@@ -21,12 +21,12 @@ export default function PublicAuditPage() {
     const id = router.query.id;
     return Array.isArray(id) ? id[0] : id;
   }, [router.query.id]);
-  const [audit, setAudit] = useState<Audit | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+
   const [password, setPassword] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [status, setStatus] = useState<"loading" | "found" | "not-found" | "unlocked" | "expired">("loading")
+  const [htmlContent, setHtmlContent] = useState<string | null>(null)
 
   useEffect(() => {
     if (!auditSlug) {
@@ -35,203 +35,145 @@ export default function PublicAuditPage() {
 
     let isMounted = true;
 
-    const loadAudit = async () => {
-      setIsLoading(true);
-      setLoadError(null);
-
+    const checkIfExistingAudit = async () => {
       const { data, error } = await supabase
-        .from("audits")
-        .select("*")
-        .eq("slug", auditSlug)
+        .from('audits')
+        .select('slug, expires_at')
+        .eq('slug', auditSlug)
         .maybeSingle();
-
-      if (!isMounted) {
-        return;
-      }
-
       if (error) {
-        setAudit(null);
-        setLoadError(error.message);
-        setIsLoading(false);
+        console.error(error);
+        setStatus("not-found")
         return;
       }
 
-      if (!data) {
-        setAudit(null);
-        setIsLoading(false);
-        return;
+      if (data) {
+        if (new Date(data.expires_at) < new Date()) {
+          setStatus("expired")
+        }
+        setStatus("found")
+      } else {
+        setStatus("not-found")
       }
-
-      console.log("DATA", data);
-
-      const mappedAudit = mapSupabaseAudit(data);
-      setAudit(mappedAudit);
-      setPassword("");
-      setPasswordError(null);
-      setIsUnlocked(!mappedAudit.password);
-      setIsLoading(false);
-    };
-
-    loadAudit();
-
+    }
+    checkIfExistingAudit()
     return () => {
       isMounted = false;
     };
   }, [auditSlug]);
 
-  const handleUnlock = (event: FormEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setPasswordError(null);
+  const handleUnlock = async () => {
+    if (!auditSlug || !password) return;
 
-    if (!audit) {
+    const { data, error } = await supabase
+      .from("audits")
+      .select("html_text")
+      .eq("slug", auditSlug)
+      .eq("password", password) // 👈 match BOTH
+      .single();
+
+    if (error) {
+      setPasswordError(error.message);
       return;
     }
 
-    if (password === audit.password) {
-      setIsUnlocked(true);
-      setPassword("");
+    if (!data) {
+      setPasswordError("Invalid password");
       return;
     }
 
-    setPasswordError("Password does not match.");
+    setHtmlContent(data.html_text)
+    setIsUnlocked(true);
+    setPassword("");
+    setStatus("unlocked")
   };
 
-  return (
-    <>
-      <Head>
-        <title>{audit ? audit.name : "Audit Viewer"}</title>
-      </Head>
-      <Stack minH="100vh" bg="bg.panel">
-        {isLoading ? (
-          <CenteredState>
-            <Spinner size="lg" />
-            <Text color="fg.subtle" fontSize="sm">
-              Loading file...
-            </Text>
-          </CenteredState>
-        ) : loadError ? (
-          <CenteredState>
-            <Heading size="md">Could not load file</Heading>
-            <Text color="fg.subtle" fontSize="sm">
-              {loadError}
-            </Text>
-          </CenteredState>
-        ) : audit ? (
-          isUnlocked ? (
-            <AuditFileViewer audit={audit} />
-          ) : (
-            <CenteredState>
-              <Stack
-                as="form"
-                gap={4}
-                w="min(360px, calc(100vw - 32px))"
-                onSubmit={handleUnlock}
-              >
-                <Box>
-                  <Heading size="md">Password Required</Heading>
-                  <Text color="fg.subtle" fontSize="sm">
-                    Enter the audit password to view this file.
-                  </Text>
-                </Box>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                />
-                <Button type="submit">Unlock</Button>
-                {passwordError ? (
-                  <Text color="red.fg" fontSize="sm">
-                    {passwordError}
-                  </Text>
-                ) : null}
-              </Stack>
-            </CenteredState>
-          )
-        ) : (
-          <CenteredState>
-            <Heading size="md">File not found</Heading>
-            <Text color="fg.subtle" fontSize="sm">
-              The requested audit file does not exist.
-            </Text>
-          </CenteredState>
-        )}
-      </Stack>
-    </>
-  );
-}
-
-function CenteredState({ children }: { children: React.ReactNode }) {
-  return (
-    <Stack
-      alignItems="center"
-      gap={3}
-      justifyContent="center"
-      minH="100vh"
-      p={4}
-      textAlign="center"
-    >
-      {children}
-    </Stack>
-  );
-}
-
-function AuditFileViewer({ audit }: { audit: Audit }) {
-  const format = audit.format.toLowerCase();
-
-  if (format.includes("pdf")) {
+  if (status === "loading") {
     return (
-      <iframe
-        title={`${audit.name} PDF viewer`}
-        src={audit.link}
-        style={{ width: "100%", height: "100vh", border: 0 }}
-      />
-    );
-  }
-
-  if (format.includes("video")) {
-    return (
-      <Box
-        display="flex"
+      <Stack
+        h={"100vh"}
         alignItems="center"
         justifyContent="center"
-        minH="100vh"
-        bg="black"
       >
-        <video
-          src={audit.link}
-          controls
-          style={{ width: "100%", maxHeight: "100vh", background: "black" }}
-        >
-          <track kind="captions" label="No captions available" />
-        </video>
-      </Box>
-    );
+        <Spinner size="lg" />
+        <Text color="fg.subtle" fontSize="sm">
+          Loading file...
+        </Text>
+      </Stack>
+    )
   }
 
-  console.log(audit)
+  if (status === "expired") {
+    return (
+      <Stack
+        h={"100vh"}
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Heading size="md">Audit expired</Heading>
+        <Text color="fg.subtle" fontSize="sm">
+          The requested audit has expired.
+          Please contact the auditor for access.
+        </Text>
+      </Stack>
+    )
+  }
 
-  if (format.includes("html")) {
+  if (status === "not-found") {
+    return (
+      <Stack
+        h={"100vh"}
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Heading size="md">Audit not found</Heading>
+        <Text color="fg.subtle" fontSize="sm">
+          The requested audit does not exist.
+        </Text>
+      </Stack>
+    )
+  }
+
+  if (status === "found" && !isUnlocked) {
+    return (
+      <Stack
+        py="5%"
+        w="100vw"
+        alignItems="center"
+        justifyContent="center"
+        gap={0}
+      >
+        <Stack
+          gap={4}
+          w="100%"
+          maxW="500px"
+        >
+          <Heading size="md">Password Required</Heading>
+          <Text color="fg.subtle" fontSize="sm">
+            Enter the audit password to view this file.
+          </Text>
+          <Input
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+          <Button onClick={() => handleUnlock()}>Unlock</Button>
+          {passwordError ? (
+            <Text color="red.fg" fontSize="sm">
+              {passwordError}
+            </Text>
+          ) : null}
+        </Stack>
+      </Stack>
+    )
+  }
+
+  if (status === "unlocked" && isUnlocked) {
     return (
       <iframe
-        srcDoc={audit.html_text}
-        style={{ width: "100%", height: "100vh", border: 0 }}
-        sandbox="allow-scripts allow-same-origin"
+        srcDoc={htmlContent ?? undefined}
+        style={{ width: "100vw", height: "100vh", border: 0 }}
       />
-    );
+    )
   }
-
-  return (
-    <CenteredState>
-      <Heading size="md">Unsupported file format</Heading>
-      <Text color="fg.subtle" fontSize="sm">
-        Open the file directly to view this audit.
-      </Text>
-      <Button asChild size="sm" variant="outline">
-        <a href={audit.link} rel="noreferrer" target="_blank">
-          <LuExternalLink />
-          Open file
-        </a>
-      </Button>
-    </CenteredState>
-  );
 }
